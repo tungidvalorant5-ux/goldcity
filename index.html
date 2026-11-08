@@ -1387,6 +1387,7 @@ async function livePoll(){const now=Date.now();
  livePill();}
 function livePill(){const p=$('livePill');if(!p)return;const age=LIVE.qAt?(Date.now()-LIVE.qAt)/1000:1e9;
  if(!LIVE.on){p.textContent=LIVE.err?'● เชื่อม MT5 ไม่ได้ · ราคาจำลอง':'● กำลังเชื่อม MT5…';p.style.color=C.amber;p.style.borderColor='rgba(255,178,62,.55)';return;}
+ if(typeof SESS!=='undefined'&&SESS.closed&&!SESS.force){p.textContent=`● ตลาดปิด · ราคาล่าสุด ${CFG.SYMBOL}`;p.style.color=C.muted;p.style.borderColor='var(--line2)';return;}
  if(age<20){p.textContent=`● LIVE MT5 · ${CFG.SYMBOL}`+(LIVE.spread?` · spread ${LIVE.spread.toFixed(2)}`:'');p.style.color=C.green;p.style.borderColor='rgba(46,230,160,.55)';}
  else{p.textContent=`● MT5 ไม่ส่งข้อมูล ${age<3600?Math.round(age/60)+' นาที':'นานแล้ว'} (ตลาดปิด / ปิดเครื่อง?)`;p.style.color=C.amber;p.style.borderColor='rgba(255,178,62,.55)';}}
 /* ข่าวจากปฏิทิน MT5 */
