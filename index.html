@@ -1484,9 +1484,10 @@ const med=a=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.length
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN;
 function evlAnalyze({bars,news}){
  const idx=new Map();bars.forEach((b,i)=>idx.set(b.t,i));const now=Date.now()/1000;
- const KMIN=-12,KMAX=24,TH=1.5,ev=[];
+ const KMIN=-12,KMAX=36,TH=1.5,ev=[];
+ const BIG=/Nonfarm|Non-Farm|CPI|FOMC|Fed Interest|PPI|Retail Sales|GDP|PCE|Powell/i;
  // รวมข่าวที่ออกเวลาเดียวกัน (เช่น NFP + Unemployment) เป็นเหตุการณ์เดียว
- const groups=new Map();for(const n of news){if(n.t>now-3600)continue;const k=Math.floor(n.t/300)*300;const g=groups.get(k)||{t:k,titles:[],high:false};g.titles.push(n.title);g.high=g.high||n.impact==='high';groups.set(k,g);}
+ const groups=new Map();for(const n of news){if(n.t>now-3600)continue;const k=Math.floor(n.t/300)*300;const g=groups.get(k)||{t:k,titles:[],high:false,big:false};g.titles.push(n.title);g.high=g.high||n.impact==='high';g.big=g.big||(n.impact==='high'&&BIG.test(n.title));groups.set(k,g);}
  for(const g of groups.values()){const i0=idx.get(g.t);if(i0==null||i0<40)continue;
   // ATR ก่อนข่าว: ช่วง 2 ชม. ที่จบก่อนข่าว 1 ชม. (ต้องเป็นแท่งต่อเนื่อง)
   const pre=[];for(let j=i0-36;j<i0-12;j++){const b=bars[j];if(b&&g.t-b.t<=3*3600+60)pre.push(b.h-b.l);}
@@ -1494,32 +1495,37 @@ function evlAnalyze({bars,news}){
   const prof=[];let ok=true;for(let k=KMIN;k<=KMAX;k++){const b=bars[i0+k];if(!b||b.t!==g.t+k*300){prof.push(null);if(k>=0&&k<=11)ok=false;continue;}prof.push((b.h-b.l)/atr);}
   if(!ok)continue;
   const p0=bars[i0].o,c=k=>bars[i0+k].c,m15=c(2)-p0,m60=c(11)-p0;let hi=-1e9,lo=1e9;for(let k=0;k<6;k++){hi=Math.max(hi,bars[i0+k].h);lo=Math.min(lo,bars[i0+k].l);}
-  ev.push({t:g.t,titles:g.titles,high:g.high,atr,prof,m15,m60,sw30:hi-lo,cont:Math.sign(m15)!==0&&Math.sign(m15)===Math.sign(m60),whip:hi>=p0+atr&&lo<=p0-atr});}
- const hiEv=ev.filter(e=>e.high);const use=hiEv.length>=5?hiEv:ev;
- const profile=[];for(let k=KMIN;k<=KMAX;k++){const v=use.map(e=>e.prof[k-KMIN]).filter(x=>x!=null);profile.push({k,v:med(v),n:v.length});}
- const base=med(profile.filter(p=>p.k<=-6).map(p=>p.v).filter(isFinite))||1;
- let before=0;for(let k=-1;k>=KMIN;k--){const p=profile[k-KMIN];if(p.v/base>=TH)before=-k*5;else break;}
- let after=0;for(let k=0;k<=KMAX;k++){const p=profile[k-KMIN];if(p.v/base>=TH)after=(k+1)*5;else break;}
+  ev.push({t:g.t,titles:g.titles,high:g.high,big:g.big,atr,prof,m15,m60,sw30:hi-lo,cont:Math.sign(m15)!==0&&Math.sign(m15)===Math.sign(m60),whip:hi>=p0+atr&&lo<=p0-atr});}
+ // แยก 2 ระดับ: ข่าวใหญ่ (CPI/NFP/FOMC/PPI/Retail/GDP/PCE/Powell) กับข่าวแรงอื่นๆ — รวมกันจะทำให้ค่ากลางจมหาย
+ const win=list=>{const profile=[];for(let k=KMIN;k<=KMAX;k++){const v=list.map(e=>e.prof[k-KMIN]).filter(x=>x!=null);profile.push({k,v:med(v),n:v.length});}
+  const base=med(profile.filter(p=>p.k<=-6).map(p=>p.v).filter(isFinite))||1;
+  // ก่อนข่าว: ย้อนจากแท่งก่อนข่าว ยอมให้ขาดได้ 1 แท่ง · หลังข่าว: นับจนแรงต่ำกว่า 1.5× ติดกัน 2 แท่ง
+  let before=0,miss=0;for(let k=-1;k>=KMIN;k--){const p=profile[k-KMIN];if(p.v/base>=TH){before=-k*5;miss=0;}else if(++miss>1)break;}
+  let after=0;miss=0;for(let k=0;k<=KMAX;k++){const p=profile[k-KMIN];if(p.v/base>=TH){after=(k+1)*5;miss=0;}else if(++miss>1)break;}
+  return{profile,base,before,after,n:list.length};};
+ const bigEv=ev.filter(e=>e.big),minEv=ev.filter(e=>e.high&&!e.big);
+ const use=bigEv.length>=5?bigEv:ev.filter(e=>e.high).length>=5?ev.filter(e=>e.high):ev;
+ const W1=win(use),W2=win(minEv);const{profile,base,before,after}=W1;
  // ตารางตามชื่อข่าว
  const by=new Map();for(const e of ev)for(const ti of new Set(e.titles)){const r=by.get(ti)||{ti,high:false,es:[]};r.high=r.high||e.high;r.es.push(e);by.set(ti,r);}
  const rows=[...by.values()].filter(r=>r.es.length>=2).map(r=>({ti:r.ti,high:r.high,n:r.es.length,m15:med(r.es.map(e=>Math.abs(e.m15))),m60:med(r.es.map(e=>Math.abs(e.m60))),sw:med(r.es.map(e=>e.sw30)),mult:med(r.es.map(e=>e.prof[-KMIN]))/base,cont:r.es.filter(e=>e.cont).length/r.es.length,whip:r.es.filter(e=>e.whip).length/r.es.length}))
   .sort((a,b)=>(b.high-a.high)||(b.mult-a.mult)).slice(0,10);
  const days=bars.length?(bars[bars.length-1].t-bars[0].t)/86400:0;
- return{ev,use,profile,base,before,after,rows,bars:bars.length,days,news:news.length,from:bars[0]&&bars[0].t,to:bars.length&&bars[bars.length-1].t};}
+ return{ev,use,profile,base,before,after,minor:W2,isBig:use===bigEv,rows,bars:bars.length,days,news:news.length,from:bars[0]&&bars[0].t,to:bars.length&&bars[bars.length-1].t};}
 function evlRender(R){const box=$('evlBody');const fd=t=>new Date(t*1000+7*3600e3).toISOString().slice(0,10).split('-').reverse().slice(0,2).join('/');
  const W=100/(R.profile.length);const mx=Math.max(3,...R.profile.map(p=>(p.v||0)/R.base));
  const bars=R.profile.map((p,i)=>{const r=(p.v||0)/R.base,h=Math.min(100,r/mx*100),hot=r>=1.5,cur=p.k===0;return`<i class="eb ${hot?'hot':''} ${cur?'zero':''}" style="left:${i*W}%;width:${W*.82}%;height:${h}%" title="${p.k*5>=0?'+':''}${p.k*5} นาที · ${r.toFixed(2)}× ปกติ · ${p.n} ข่าว"></i>`;}).join('');
  const thY=1.5/mx*100;
  const conf=R.use.length>=30?['ok','ข้อมูลพอใช้']:R.use.length>=10?['mid','ข้อมูลยังน้อย · ดูเป็นแนวโน้ม']:['low','ข้อมูลน้อยมาก · ยังสรุปไม่ได้'];
- const cur=30;const sug=`งด ${R.before} นาทีก่อน – ${R.after} นาทีหลังข่าวแรง`;
+ const cur=30;const sug=`ข่าวใหญ่: งด ${R.before} นาทีก่อน – ${R.after} นาทีหลัง · ข่าวรอง: งด ${R.minor.before} ก่อน – ${R.minor.after} นาทีหลัง`;
  box.innerHTML=`<div class="evk">
-  <div><span class="lbl">ข่าวที่วิเคราะห์</span><b>${R.use.length}</b><small>${R.use===R.ev?'ทุกระดับ':'ข่าวแรง'} · จาก ${R.ev.length} เหตุการณ์</small></div>
+  <div><span class="lbl">ข่าวที่วิเคราะห์</span><b>${R.use.length}</b><small>${R.isBig?'ข่าวใหญ่':'ข่าวแรง'} · จาก ${R.ev.length} เหตุการณ์</small></div>
   <div><span class="lbl">ข้อมูลราคา</span><b>${Math.round(R.days)} วัน</b><small>${R.bars.toLocaleString()} แท่ง M5 · ${R.from?fd(R.from)+'–'+fd(R.to):''}</small></div>
-  <div><span class="lbl">ช่วงที่ทองเหวี่ยงแรง (≥1.5× ปกติ)</span><b class="gd">−${R.before} / +${R.after} นาที</b><small>กฎตอนนี้: −${cur} / +${cur} นาที</small></div>
+  <div><span class="lbl">ข่าวใหญ่ · ทองเหวี่ยงแรง (≥1.5×)</span><b class="gd">−${R.before} / +${R.after} นาที</b><small>ข่าวรอง ${R.minor.n} ครั้ง: −${R.minor.before} / +${R.minor.after} นาที · กฎตอนนี้ −${cur} / +${cur}</small></div>
   <div class="evc ${conf[0]}"><span class="lbl">ความน่าเชื่อถือ</span><b>${conf[1]}</b><small>ต้องการ ≥ 30 ข่าวแรง</small></div></div>
-  <div class="evp"><div class="evpl"><span>ความแรงของแท่ง M5 เทียบช่วงปกติ (ค่ากลาง)</span><span>ข่าวออก = เส้นขาว · แท่งแดง = เหวี่ยงแรง ≥1.5×</span></div>
+  <div class="evp"><div class="evpl"><span>ข่าวใหญ่ · ความแรงของแท่ง M5 เทียบช่วงปกติ (ค่ากลาง)</span><span>ข่าวออก = เส้นขาว · แท่งแดง = เหวี่ยงแรง ≥1.5×</span></div>
    <div class="evpc"><div class="th" style="bottom:${thY}%"><span>1.5×</span></div><div class="z" style="left:${12*W}%"></div>${bars}</div>
-   <div class="evpx"><span>−60 นาที</span><span>−30</span><span>ข่าวออก</span><span>+30</span><span>+60</span><span>+90</span><span>+120</span></div></div>
+   <div class="evpx"><span>−60 นาที</span><span>ข่าวออก</span><span>+60</span><span>+120</span><span>+180</span></div></div>
   <div class="evr"><b>ข้อเสนอจากข้อมูล:</b> ${R.use.length>=10?sug+' · เทียบกฎเดิม: ก่อนข่าว '+(R.before<cur?'สั้นกว่า (เข้าเทรดได้ใกล้ข่าวขึ้น)':R.before>cur?'ยาวกว่า (ควรหยุดเร็วขึ้น)':'เท่าเดิม')+' · หลังข่าว '+(R.after<cur?'สั้นกว่า (กลับมาเทรดได้เร็วขึ้น)':R.after>cur?'ยาวกว่า (ควรรอนานขึ้น)':'เท่าเดิม'):'ยังไม่พอจะเสนอ รอข้อมูลเพิ่ม'} · <span class="mu">ยังไม่เปลี่ยนกฎ News Gate อัตโนมัติ · ต้องยืนยันก่อน</span></div>
   ${R.rows.length?`<div class="evt"><table><thead><tr><th>ข่าว</th><th>ครั้ง</th><th>แท่งแรกแรงกว่าปกติ</th><th>วิ่ง 15 นาที</th><th>วิ่ง 60 นาที</th><th>เหวี่ยงใน 30 นาที</th><th>วิ่งต่อทิศเดิม</th><th>สะบัดโดน SL ทั้งสองฝั่ง</th></tr></thead><tbody>${R.rows.map(r=>`<tr><td><i style="background:${r.high?C.pink:C.amber}"></i>${r.ti}</td><td>${r.n}</td><td class="${r.mult>=3?'pk':r.mult>=1.5?'am':''}">${r.mult.toFixed(1)}×</td><td>$${r.m15.toFixed(2)}</td><td>$${r.m60.toFixed(2)}</td><td>$${r.sw.toFixed(2)}</td><td>${Math.round(r.cont*100)}%</td><td class="${r.whip>=.3?'pk':''}">${Math.round(r.whip*100)}%</td></tr>`).join('')}</tbody></table></div>`:'<div class="mu" style="font-family:var(--thai)">ยังไม่มีข่าวที่เกิดซ้ำ ≥ 2 ครั้งในข้อมูล</div>'}
   <div class="evn">⚠️ ข้อจำกัด: ใช้แท่ง M5 · ไม่เห็นการเหวี่ยงภายในแท่ง และไม่รวม slippage/spread ที่ถ่างตอนข่าว ซึ่งของจริงมักแย่กว่านี้ · "สะบัดโดน SL ทั้งสองฝั่ง" = ภายใน 30 นาทีราคาวิ่งเกิน 1 ATR ทั้งขึ้นและลง (ถ้าเข้าไม้ก่อนข่าว โดน SL ไม่ว่าฝั่งไหน) · ค่าที่ใช้เป็นค่ากลาง (median) ลดผลจากข่าวที่เหวี่ยงผิดปกติ</div>`;}
