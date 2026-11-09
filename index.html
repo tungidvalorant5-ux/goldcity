@@ -1315,6 +1315,11 @@ const hm=ms=>bkk(ms).toISOString().slice(11,16);
 const dayKey=ms=>bkk(ms).toISOString().slice(0,10);
 const DOW=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
 function dur(ms){ms=Math.max(0,ms);const h=Math.floor(ms/3600000),m=Math.floor(ms/60000)%60;return h?`${h} ชม. ${m} นาที`:`${m} นาที`;}
+// กฎข่าว 2 ระดับ (จากผล Event Lab 10/11/2026): ข่าวใหญ่ทองเหวี่ยงแรง ~2 ชม. · ข่าวรองแทบไม่กระทบ
+const NG_BIG=/Nonfarm|Non-Farm|Non Farm|CPI|Inflation Rate|FOMC|Fed Interest|PPI|Retail Sales|GDP|PCE|Powell/i,NG={big:[15,120],min:[5,10]};
+const ngBig=e=>NG_BIG.test(e.title||e.th||'');
+const ngWin=e=>{const t=Date.parse(e.t),w=ngBig(e)?NG.big:NG.min;return[t-w[0]*60000,t+w[1]*60000];};
+const ngIn=(e,now)=>{const w=ngWin(e);return now>=w[0]&&now<=w[1];};
 function gate(){
  const now=Date.now(),gv=$('gv'),d=bkk(now),wd=d.getUTCDay();$('gvDay').textContent=`${DOW[wd]} ${d.toISOString().slice(8,10)}/${d.toISOString().slice(5,7)}`;
  const set=(cls,big,why,cd,pill)=>{gv.className='gv '+cls;$('gvBig').textContent=big;$('gvWhy').textContent=why;$('gvCd').innerHTML=cd||'';$('gatePill').textContent='NEWS · '+pill;$('gatePill').style.color=cls==='ok'?C.green:cls==='warn'?C.amber:cls==='stop'?C.pink:C.muted;};
@@ -1324,19 +1329,19 @@ function gate(){
  if(!NEWS.loaded){set('', 'กำลังโหลดข่าว…','รอปฏิทินข่าวสัปดาห์นี้','', '—');return;}
  if(!NEWS.ev.length){set('','ยังไม่มีข้อมูลข่าว','ปฏิทินสัปดาห์นี้ยังไม่ถูกอัปเดต ให้เช็ก Forex Factory เองก่อนเทรด','','ไม่มีข้อมูล');return;}
  if(wd===0||(wd===6&&d.getUTCHours()>=5)){set('','ตลาดปิด','เสาร์–อาทิตย์ ทองไม่มีราคาเคลื่อนไหว',cdNext,'ตลาดปิด');return;}
- const blk=hi.find(e=>{const t=Date.parse(e.t);return now>=t-30*60000&&now<=t+30*60000;});
- if(blk){const t=Date.parse(blk.t),pre=now<t;set('stop','งดเทรดตอนนี้',`${blk.th} ${pre?'จะออก':'เพิ่งออก'} ${hm(t)} · ราคาเหวี่ยงแรง SL โดนกวาดง่าย`,pre?`ข่าวออกในอีก <b>${dur(t-now)}</b>`:`เทรดได้อีกครั้งใน <b>${dur(t+30*60000-now)}</b>`,'งดเทรด');return;}
- const today=hi.filter(e=>dayKey(Date.parse(e.t))===dayKey(now)&&Date.parse(e.t)+30*60000>now);
- if(today.length){const e=today[0],t=Date.parse(e.t);set('warn','เทรดได้ แต่ระวัง',`วันนี้มีข่าวแรง: ${today.map(x=>x.th+' '+hm(Date.parse(x.t))).join(' · ')} · ลดล็อต และงด ${hm(t-30*60000)}–${hm(t+30*60000)}`,cdNext,'ระวัง');return;}
+ const blk=hi.find(e=>ngBig(e)&&ngIn(e,now))||hi.find(e=>ngIn(e,now));
+ if(blk){const t=Date.parse(blk.t),pre=now<t,end=Math.max(...hi.filter(e=>ngIn(e,now)).map(e=>ngWin(e)[1]));set('stop','งดเทรดตอนนี้',`${ngBig(blk)?'ข่าวใหญ่':'ข่าวรอง'} ${blk.th} ${pre?'จะออก':'เพิ่งออก'} ${hm(t)} · ${ngBig(blk)?'ทองเหวี่ยงแรงได้ถึง ~2 ชม.':'ราคาสะบัดช่วงสั้น'}`,pre?`ข่าวออกในอีก <b>${dur(t-now)}</b>`:`เทรดได้อีกครั้งใน <b>${dur(end-now)}</b>`,'งดเทรด');return;}
+ const today=hi.filter(e=>dayKey(Date.parse(e.t))===dayKey(now)&&ngWin(e)[1]>now);
+ if(today.length){const bigs=today.filter(ngBig);set('warn','เทรดได้ แต่ระวัง',`วันนี้มีข่าว: ${today.map(x=>(ngBig(x)?'★':'')+x.th+' '+hm(Date.parse(x.t))).join(' · ')} · งด ${today.map(x=>{const w=ngWin(x);return hm(w[0])+'–'+hm(w[1]);}).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}${bigs.length?' · ★ ข่าวใหญ่ งด 15 นาทีก่อน → 2 ชม. หลัง':''}`,cdNext,'ระวัง');return;}
  set('ok','เทรดได้ตามแสงอุสา','ไม่มีข่าวแรง USD ที่ใกล้เข้ามาในวันนี้ · ใช้สัญญาณกับกฎความเสี่ยงตามปกติ',cdNext,'เทรดได้');
 }
 function renderWeek(){
  const now=Date.now(),box=$('wk');if(!NEWS.ev.length){box.innerHTML='<div class="we"><span></span><span></span><span class="ti mu">ยังไม่มีข้อมูล · ให้ Claude อัปเดตปฏิทิน</span><span></span></div>';return;}
  const nxt=NEWS.ev.find(e=>Date.parse(e.t)>now);let html='',dk='';
  for(const e of NEWS.ev){const t=Date.parse(e.t),k=dayKey(t);if(k!==dk){dk=k;html+=`<div class="wd">${DOW[bkk(t).getUTCDay()]} ${k.slice(8,10)}/${k.slice(5,7)}</div>`;}
-  const live=e.impact==='high'&&now>=t-30*60000&&now<=t+30*60000,cls=live?'now':e===nxt?'next':t<now?'past':'';
+  const live=e.impact==='high'&&ngIn(e,now),cls=live?'now':e===nxt?'next':t<now?'past':'';
   const nv=[e.act?`จริง ${e.act}`:'',e.fc?`คาด ${e.fc}`:'',e.prev?`ก่อน ${e.prev}`:''].filter(Boolean).join(' · ');
-  html+=`<div class="we ${cls}"><span class="tm">${e.allDay?'ทั้งวัน':hm(t)}</span><i style="background:${e.impact==='high'?C.pink:C.amber}"></i><span class="ti" title="${e.title}">${e.th}</span><span class="nv">${nv}</span></div>`;}
+  html+=`<div class="we ${cls}"><span class="tm">${e.allDay?'ทั้งวัน':hm(t)}</span><i style="background:${e.impact==='high'?C.pink:C.amber}"></i><span class="ti" title="${e.title}">${e.impact==='high'&&ngBig(e)?'★ ':''}${e.th}</span><span class="nv">${nv}</span></div>`;}
  if(box.dataset.h!==html){box.innerHTML=html;box.dataset.h=html;}
  const src=NEWS.meta?`ข้อมูล: ${NEWS.meta.source||'—'} · อัปเดต ${NEWS.meta.updated?hm(Date.parse(NEWS.meta.updated))+' '+dayKey(Date.parse(NEWS.meta.updated)).slice(5).split('-').reverse().join('/'):'—'}${NEWS.meta.updated&&now-Date.parse(NEWS.meta.updated)>8*86400000?' · ข้อมูลเก่าแล้ว':''}`:'';
  $('gvSrc').textContent='กฎ: งด 30 นาทีก่อน–หลังข่าวแรง USD · วันข่าวแรงให้ลดล็อต'+(src?' · '+src:'');
@@ -1517,16 +1522,16 @@ function evlRender(R){const box=$('evlBody');const fd=t=>new Date(t*1000+7*3600e
  const bars=R.profile.map((p,i)=>{const r=(p.v||0)/R.base,h=Math.min(100,r/mx*100),hot=r>=1.5,cur=p.k===0;return`<i class="eb ${hot?'hot':''} ${cur?'zero':''}" style="left:${i*W}%;width:${W*.82}%;height:${h}%" title="${p.k*5>=0?'+':''}${p.k*5} นาที · ${r.toFixed(2)}× ปกติ · ${p.n} ข่าว"></i>`;}).join('');
  const thY=1.5/mx*100;
  const conf=R.use.length>=30?['ok','ข้อมูลพอใช้']:R.use.length>=10?['mid','ข้อมูลยังน้อย · ดูเป็นแนวโน้ม']:['low','ข้อมูลน้อยมาก · ยังสรุปไม่ได้'];
- const cur=30;const sug=`ข่าวใหญ่: งด ${R.before} นาทีก่อน – ${R.after} นาทีหลัง · ข่าวรอง: งด ${R.minor.before} ก่อน – ${R.minor.after} นาทีหลัง`;
+ const cur=NG.big[0],curA=NG.big[1];const sug=`ข่าวใหญ่: งด ${R.before} นาทีก่อน – ${R.after} นาทีหลัง · ข่าวรอง: งด ${R.minor.before} ก่อน – ${R.minor.after} นาทีหลัง`;
  box.innerHTML=`<div class="evk">
   <div><span class="lbl">ข่าวที่วิเคราะห์</span><b>${R.use.length}</b><small>${R.isBig?'ข่าวใหญ่':'ข่าวแรง'} · จาก ${R.ev.length} เหตุการณ์</small></div>
   <div><span class="lbl">ข้อมูลราคา</span><b>${Math.round(R.days)} วัน</b><small>${R.bars.toLocaleString()} แท่ง M5 · ${R.from?fd(R.from)+'–'+fd(R.to):''}</small></div>
-  <div><span class="lbl">ข่าวใหญ่ · ทองเหวี่ยงแรง (≥1.5×)</span><b class="gd">−${R.before} / +${R.after} นาที</b><small>ข่าวรอง ${R.minor.n} ครั้ง: −${R.minor.before} / +${R.minor.after} นาที · กฎตอนนี้ −${cur} / +${cur}</small></div>
+  <div><span class="lbl">ข่าวใหญ่ · ทองเหวี่ยงแรง (≥1.5×)</span><b class="gd">−${R.before} / +${R.after} นาที</b><small>ข่าวรอง ${R.minor.n} ครั้ง: −${R.minor.before} / +${R.minor.after} นาที · กฎตอนนี้ ใหญ่ −${NG.big[0]}/+${NG.big[1]} · รอง −${NG.min[0]}/+${NG.min[1]}</small></div>
   <div class="evc ${conf[0]}"><span class="lbl">ความน่าเชื่อถือ</span><b>${conf[1]}</b><small>ต้องการ ≥ 30 ข่าวแรง</small></div></div>
   <div class="evp"><div class="evpl"><span>ข่าวใหญ่ · ความแรงของแท่ง M5 เทียบช่วงปกติ (ค่ากลาง)</span><span>ข่าวออก = เส้นขาว · แท่งแดง = เหวี่ยงแรง ≥1.5×</span></div>
    <div class="evpc"><div class="th" style="bottom:${thY}%"><span>1.5×</span></div><div class="z" style="left:${12*W}%"></div>${bars}</div>
    <div class="evpx"><span>−60 นาที</span><span>ข่าวออก</span><span>+60</span><span>+120</span><span>+180</span></div></div>
-  <div class="evr"><b>ข้อเสนอจากข้อมูล:</b> ${R.use.length>=10?sug+' · เทียบกฎเดิม: ก่อนข่าว '+(R.before<cur?'สั้นกว่า (เข้าเทรดได้ใกล้ข่าวขึ้น)':R.before>cur?'ยาวกว่า (ควรหยุดเร็วขึ้น)':'เท่าเดิม')+' · หลังข่าว '+(R.after<cur?'สั้นกว่า (กลับมาเทรดได้เร็วขึ้น)':R.after>cur?'ยาวกว่า (ควรรอนานขึ้น)':'เท่าเดิม'):'ยังไม่พอจะเสนอ รอข้อมูลเพิ่ม'} · <span class="mu">ยังไม่เปลี่ยนกฎ News Gate อัตโนมัติ · ต้องยืนยันก่อน</span></div>
+  <div class="evr"><b>ข้อเสนอจากข้อมูล:</b> ${R.use.length>=10?sug+' · เทียบกฎข่าวใหญ่ตอนนี้: ก่อนข่าว '+(R.before<cur?'สั้นกว่า (เข้าเทรดได้ใกล้ข่าวขึ้น)':R.before>cur?'ยาวกว่า (ควรหยุดเร็วขึ้น)':'เท่าเดิม')+' · หลังข่าว '+(R.after<curA-15?'สั้นกว่า (กลับมาเทรดได้เร็วขึ้น)':R.after>curA+15?'ยาวกว่า (ควรรอนานขึ้น)':'ใกล้เคียงกฎตอนนี้'):'ยังไม่พอจะเสนอ รอข้อมูลเพิ่ม'} · <span class="mu">News Gate ใช้กฎ 2 ระดับแล้ว (ตั้งตามผล 10/11)</span></div>
   ${R.rows.length?`<div class="evt"><table><thead><tr><th>ข่าว</th><th>ครั้ง</th><th>แท่งแรกแรงกว่าปกติ</th><th>วิ่ง 15 นาที</th><th>วิ่ง 60 นาที</th><th>เหวี่ยงใน 30 นาที</th><th>วิ่งต่อทิศเดิม</th><th>สะบัดโดน SL ทั้งสองฝั่ง</th></tr></thead><tbody>${R.rows.map(r=>`<tr><td><i style="background:${r.high?C.pink:C.amber}"></i>${r.ti}</td><td>${r.n}</td><td class="${r.mult>=3?'pk':r.mult>=1.5?'am':''}">${r.mult.toFixed(1)}×</td><td>$${r.m15.toFixed(2)}</td><td>$${r.m60.toFixed(2)}</td><td>$${r.sw.toFixed(2)}</td><td>${Math.round(r.cont*100)}%</td><td class="${r.whip>=.3?'pk':''}">${Math.round(r.whip*100)}%</td></tr>`).join('')}</tbody></table></div>`:'<div class="mu" style="font-family:var(--thai)">ยังไม่มีข่าวที่เกิดซ้ำ ≥ 2 ครั้งในข้อมูล</div>'}
   <div class="evn">⚠️ ข้อจำกัด: ใช้แท่ง M5 · ไม่เห็นการเหวี่ยงภายในแท่ง และไม่รวม slippage/spread ที่ถ่างตอนข่าว ซึ่งของจริงมักแย่กว่านี้ · "สะบัดโดน SL ทั้งสองฝั่ง" = ภายใน 30 นาทีราคาวิ่งเกิน 1 ATR ทั้งขึ้นและลง (ถ้าเข้าไม้ก่อนข่าว โดน SL ไม่ว่าฝั่งไหน) · ค่าที่ใช้เป็นค่ากลาง (median) ลดผลจากข่าวที่เหวี่ยงผิดปกติ</div>`;}
 async function evlRun(){if(EVL.busy)return;EVL.busy=true;const btn=$('evlBtn'),st=$('evlSt');btn.disabled=true;
