@@ -210,6 +210,23 @@ body{font-family:var(--mono);font-size:12px;line-height:1.4;padding-block:10px 1
 @media (max-width:900px){.scards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.scards{grid-template-columns:minmax(0,1fr)}.tax,.tbody{margin-left:70px}.tr b{font-size:9px}}
 @media (prefers-reduced-motion:reduce){.chip2 i{animation:none}}
+.evk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.evk>div{border:1px solid var(--line2);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;background:var(--panel2)}
+.evk b{font-size:18px;font-variant-numeric:tabular-nums}.evk small{font-family:var(--thai);font-size:11px;color:var(--muted)}
+.evc.ok b{color:var(--green)}.evc.mid b{color:var(--amber);font-size:14px;font-family:var(--thai)}.evc.low b{color:var(--pink);font-size:14px;font-family:var(--thai)}
+.evp{margin-top:10px}.evpl{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-family:var(--thai);font-size:11px;color:var(--muted);margin-bottom:4px}
+.evpc{position:relative;height:120px;border-bottom:1px solid var(--line2);background:repeating-linear-gradient(0deg,transparent 0 29px,var(--line) 29px 30px)}
+.eb{position:absolute;bottom:0;border-radius:2px 2px 0 0;background:linear-gradient(180deg,var(--cyan),rgba(54,214,255,.25))}
+.eb.hot{background:linear-gradient(180deg,var(--pink),rgba(255,61,113,.3));box-shadow:0 0 10px -3px var(--pink)}
+.evpc .z{position:absolute;top:-4px;bottom:0;width:2px;background:#fff;box-shadow:0 0 8px #fff;z-index:2}
+.evpc .th{position:absolute;left:0;right:0;border-top:1px dashed var(--amber);z-index:1}.evpc .th span{position:absolute;right:0;top:-14px;font-size:9.5px;color:var(--amber)}
+.evpx{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);margin-top:3px;font-family:var(--thai)}
+.evr{margin-top:10px;font-family:var(--thai);font-size:13px;padding:8px 10px;border:1px solid rgba(245,196,81,.5);border-radius:6px;background:rgba(245,196,81,.06)}
+.evt{overflow-x:auto;margin-top:10px}.evt table{border-collapse:collapse;width:100%;font-size:11.5px;min-width:720px}
+.evt th{font-family:var(--thai);font-weight:500;color:var(--muted);text-align:right;padding:5px 6px;border-bottom:1px solid var(--line2)}.evt th:first-child,.evt td:first-child{text-align:left}
+.evt td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}.evt td i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px}
+.evn{margin-top:8px;font-family:var(--thai);font-size:11px;color:var(--muted);line-height:1.5}
+@media (max-width:820px){.evk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mtfsum{font-family:var(--thai);font-weight:700;font-size:13.5px;text-align:center;padding:6px;border:1px dashed var(--line2);border-radius:3px}
 /* signal + live chart */
 .trade{display:grid;grid-template-columns:300px minmax(0,1fr);gap:10px}
@@ -284,6 +301,10 @@ body{font-family:var(--mono);font-size:12px;line-height:1.4;padding-block:10px 1
     </section>
   </div>
 
+  <section class="panel evl" aria-label="Event Lab ผลของข่าวต่อราคาทอง">
+    <div class="ph"><span class="t">🧪 Event Lab · ทองทำตัวยังไงรอบข่าว</span><span class="lbl"><span id="evlSt">ข้อมูลจริงจาก MT5 · กดเพื่อวิเคราะห์</span> <button id="evlBtn" class="stest">▶ วิเคราะห์ข่าวย้อนหลัง</button></span></div>
+    <div id="evlBody"><div class="mu" style="font-family:var(--thai);font-size:12.5px">ดูว่าก่อน–หลังข่าว USD ทองเหวี่ยงแรงแค่ไหน นานกี่นาที ข่าวไหนอันตรายจริง และกฎงดเทรด 30 นาทีเหมาะหรือยัง · ใช้แท่ง M5 กับปฏิทินข่าวที่ EA ส่งขึ้นมา</div></div>
+  </section>
   <div class="main">
     <section class="panel">
       <div class="ph"><span class="t">Event feed</span><span class="lbl" id="evc">0/6</span></div>
@@ -1452,6 +1473,62 @@ function renderSess(){const box=$('sessCards');if(!box)return;const now=Date.now
  const pill=$('sessPill');if(pill){pill.textContent='SESSION · '+(wk?'ปิด':open.length?open.map(m=>m.n.split(' ')[0]).join('+'):'—');pill.style.color=ln&&ny?C.gold:open.length?C.cyan:C.muted;}}
 setInterval(renderSess,1000);renderSess();
 $('sessTest').addEventListener('click',()=>{SESS.force='closed';renderSess();renderAgents();setTimeout(()=>{SESS.force='open';renderSess();renderAgents();setTimeout(()=>{SESS.force=null;renderSess();},7000);},9000);});
+
+/* ---------- EVENT LAB · ทองทำตัวยังไงรอบข่าว (ข้อมูลจริงจาก MT5) ---------- */
+const EVL={busy:false,res:null};
+async function evlLoad(onp){
+ let bars=[];for(let p=0;p<40;p++){const pg=await sbGet(`candles?select=t,o,h,l,c&symbol=eq.${SYM}&tf=eq.M5&order=t.asc&limit=1000&offset=${p*1000}`);bars=bars.concat(pg);onp(`โหลดแท่ง M5 ${bars.length.toLocaleString()} แท่ง…`);if(pg.length<1000)break;}
+ const news=await sbGet(`news?select=t,title,impact,allday&order=t.asc&limit=5000`);
+ return{bars:bars.map(b=>({t:+b.t,o:+b.o,h:+b.h,l:+b.l,c:+b.c})),news:news.filter(n=>!n.allday)};}
+const med=a=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN;
+function evlAnalyze({bars,news}){
+ const idx=new Map();bars.forEach((b,i)=>idx.set(b.t,i));const now=Date.now()/1000;
+ const KMIN=-12,KMAX=24,TH=1.5,ev=[];
+ // รวมข่าวที่ออกเวลาเดียวกัน (เช่น NFP + Unemployment) เป็นเหตุการณ์เดียว
+ const groups=new Map();for(const n of news){if(n.t>now-3600)continue;const k=Math.floor(n.t/300)*300;const g=groups.get(k)||{t:k,titles:[],high:false};g.titles.push(n.title);g.high=g.high||n.impact==='high';groups.set(k,g);}
+ for(const g of groups.values()){const i0=idx.get(g.t);if(i0==null||i0<40)continue;
+  // ATR ก่อนข่าว: ช่วง 2 ชม. ที่จบก่อนข่าว 1 ชม. (ต้องเป็นแท่งต่อเนื่อง)
+  const pre=[];for(let j=i0-36;j<i0-12;j++){const b=bars[j];if(b&&g.t-b.t<=3*3600+60)pre.push(b.h-b.l);}
+  if(pre.length<18)continue;const atr=avg(pre);if(!(atr>0))continue;
+  const prof=[];let ok=true;for(let k=KMIN;k<=KMAX;k++){const b=bars[i0+k];if(!b||b.t!==g.t+k*300){prof.push(null);if(k>=0&&k<=11)ok=false;continue;}prof.push((b.h-b.l)/atr);}
+  if(!ok)continue;
+  const p0=bars[i0].o,c=k=>bars[i0+k].c,m15=c(2)-p0,m60=c(11)-p0;let hi=-1e9,lo=1e9;for(let k=0;k<6;k++){hi=Math.max(hi,bars[i0+k].h);lo=Math.min(lo,bars[i0+k].l);}
+  ev.push({t:g.t,titles:g.titles,high:g.high,atr,prof,m15,m60,sw30:hi-lo,cont:Math.sign(m15)!==0&&Math.sign(m15)===Math.sign(m60),whip:hi>=p0+atr&&lo<=p0-atr});}
+ const hiEv=ev.filter(e=>e.high);const use=hiEv.length>=5?hiEv:ev;
+ const profile=[];for(let k=KMIN;k<=KMAX;k++){const v=use.map(e=>e.prof[k-KMIN]).filter(x=>x!=null);profile.push({k,v:med(v),n:v.length});}
+ const base=med(profile.filter(p=>p.k<=-6).map(p=>p.v).filter(isFinite))||1;
+ let before=0;for(let k=-1;k>=KMIN;k--){const p=profile[k-KMIN];if(p.v/base>=TH)before=-k*5;else break;}
+ let after=0;for(let k=0;k<=KMAX;k++){const p=profile[k-KMIN];if(p.v/base>=TH)after=(k+1)*5;else break;}
+ // ตารางตามชื่อข่าว
+ const by=new Map();for(const e of ev)for(const ti of new Set(e.titles)){const r=by.get(ti)||{ti,high:false,es:[]};r.high=r.high||e.high;r.es.push(e);by.set(ti,r);}
+ const rows=[...by.values()].filter(r=>r.es.length>=2).map(r=>({ti:r.ti,high:r.high,n:r.es.length,m15:med(r.es.map(e=>Math.abs(e.m15))),m60:med(r.es.map(e=>Math.abs(e.m60))),sw:med(r.es.map(e=>e.sw30)),mult:med(r.es.map(e=>e.prof[-KMIN]))/base,cont:r.es.filter(e=>e.cont).length/r.es.length,whip:r.es.filter(e=>e.whip).length/r.es.length}))
+  .sort((a,b)=>(b.high-a.high)||(b.mult-a.mult)).slice(0,10);
+ const days=bars.length?(bars[bars.length-1].t-bars[0].t)/86400:0;
+ return{ev,use,profile,base,before,after,rows,bars:bars.length,days,news:news.length,from:bars[0]&&bars[0].t,to:bars.length&&bars[bars.length-1].t};}
+function evlRender(R){const box=$('evlBody');const fd=t=>new Date(t*1000+7*3600e3).toISOString().slice(0,10).split('-').reverse().slice(0,2).join('/');
+ const W=100/(R.profile.length);const mx=Math.max(3,...R.profile.map(p=>(p.v||0)/R.base));
+ const bars=R.profile.map((p,i)=>{const r=(p.v||0)/R.base,h=Math.min(100,r/mx*100),hot=r>=1.5,cur=p.k===0;return`<i class="eb ${hot?'hot':''} ${cur?'zero':''}" style="left:${i*W}%;width:${W*.82}%;height:${h}%" title="${p.k*5>=0?'+':''}${p.k*5} นาที · ${r.toFixed(2)}× ปกติ · ${p.n} ข่าว"></i>`;}).join('');
+ const thY=1.5/mx*100;
+ const conf=R.use.length>=30?['ok','ข้อมูลพอใช้']:R.use.length>=10?['mid','ข้อมูลยังน้อย · ดูเป็นแนวโน้ม']:['low','ข้อมูลน้อยมาก · ยังสรุปไม่ได้'];
+ const cur=30;const sug=`งด ${R.before} นาทีก่อน – ${R.after} นาทีหลังข่าวแรง`;
+ box.innerHTML=`<div class="evk">
+  <div><span class="lbl">ข่าวที่วิเคราะห์</span><b>${R.use.length}</b><small>${R.use===R.ev?'ทุกระดับ':'ข่าวแรง'} · จาก ${R.ev.length} เหตุการณ์</small></div>
+  <div><span class="lbl">ข้อมูลราคา</span><b>${Math.round(R.days)} วัน</b><small>${R.bars.toLocaleString()} แท่ง M5 · ${R.from?fd(R.from)+'–'+fd(R.to):''}</small></div>
+  <div><span class="lbl">ช่วงที่ทองเหวี่ยงแรง (≥1.5× ปกติ)</span><b class="gd">−${R.before} / +${R.after} นาที</b><small>กฎตอนนี้: −${cur} / +${cur} นาที</small></div>
+  <div class="evc ${conf[0]}"><span class="lbl">ความน่าเชื่อถือ</span><b>${conf[1]}</b><small>ต้องการ ≥ 30 ข่าวแรง</small></div></div>
+  <div class="evp"><div class="evpl"><span>ความแรงของแท่ง M5 เทียบช่วงปกติ (ค่ากลาง)</span><span>ข่าวออก = เส้นขาว · แท่งแดง = เหวี่ยงแรง ≥1.5×</span></div>
+   <div class="evpc"><div class="th" style="bottom:${thY}%"><span>1.5×</span></div><div class="z" style="left:${12*W}%"></div>${bars}</div>
+   <div class="evpx"><span>−60 นาที</span><span>−30</span><span>ข่าวออก</span><span>+30</span><span>+60</span><span>+90</span><span>+120</span></div></div>
+  <div class="evr"><b>ข้อเสนอจากข้อมูล:</b> ${R.use.length>=10?sug+' · เทียบกฎเดิม: ก่อนข่าว '+(R.before<cur?'สั้นกว่า (เข้าเทรดได้ใกล้ข่าวขึ้น)':R.before>cur?'ยาวกว่า (ควรหยุดเร็วขึ้น)':'เท่าเดิม')+' · หลังข่าว '+(R.after<cur?'สั้นกว่า (กลับมาเทรดได้เร็วขึ้น)':R.after>cur?'ยาวกว่า (ควรรอนานขึ้น)':'เท่าเดิม'):'ยังไม่พอจะเสนอ รอข้อมูลเพิ่ม'} · <span class="mu">ยังไม่เปลี่ยนกฎ News Gate อัตโนมัติ · ต้องยืนยันก่อน</span></div>
+  ${R.rows.length?`<div class="evt"><table><thead><tr><th>ข่าว</th><th>ครั้ง</th><th>แท่งแรกแรงกว่าปกติ</th><th>วิ่ง 15 นาที</th><th>วิ่ง 60 นาที</th><th>เหวี่ยงใน 30 นาที</th><th>วิ่งต่อทิศเดิม</th><th>สะบัดโดน SL ทั้งสองฝั่ง</th></tr></thead><tbody>${R.rows.map(r=>`<tr><td><i style="background:${r.high?C.pink:C.amber}"></i>${r.ti}</td><td>${r.n}</td><td class="${r.mult>=3?'pk':r.mult>=1.5?'am':''}">${r.mult.toFixed(1)}×</td><td>$${r.m15.toFixed(2)}</td><td>$${r.m60.toFixed(2)}</td><td>$${r.sw.toFixed(2)}</td><td>${Math.round(r.cont*100)}%</td><td class="${r.whip>=.3?'pk':''}">${Math.round(r.whip*100)}%</td></tr>`).join('')}</tbody></table></div>`:'<div class="mu" style="font-family:var(--thai)">ยังไม่มีข่าวที่เกิดซ้ำ ≥ 2 ครั้งในข้อมูล</div>'}
+  <div class="evn">⚠️ ข้อจำกัด: ใช้แท่ง M5 · ไม่เห็นการเหวี่ยงภายในแท่ง และไม่รวม slippage/spread ที่ถ่างตอนข่าว ซึ่งของจริงมักแย่กว่านี้ · "สะบัดโดน SL ทั้งสองฝั่ง" = ภายใน 30 นาทีราคาวิ่งเกิน 1 ATR ทั้งขึ้นและลง (ถ้าเข้าไม้ก่อนข่าว โดน SL ไม่ว่าฝั่งไหน) · ค่าที่ใช้เป็นค่ากลาง (median) ลดผลจากข่าวที่เหวี่ยงผิดปกติ</div>`;}
+async function evlRun(){if(EVL.busy)return;EVL.busy=true;const btn=$('evlBtn'),st=$('evlSt');btn.disabled=true;
+ try{if(!CFG.SUPABASE_KEY)throw new Error('ยังไม่ได้ใส่ Publishable key');const d=await evlLoad(m=>st.textContent=m);st.textContent='กำลังวิเคราะห์…';const R=evlAnalyze(d);EVL.res=R;evlRender(R);
+  st.textContent=`อัปเดต ${new Date(Date.now()+7*3600e3).toISOString().slice(11,16)} น.`;}
+ catch(e){st.textContent='ทำไม่ได้: '+(e.message||e);}
+ btn.disabled=false;EVL.busy=false;}
+$('evlBtn').addEventListener('click',evlRun);
 
 /* ---------- clock + boot ---------- */
 setInterval(()=>{$('clock').textContent=new Date(Date.now()+7*3600e3).toISOString().slice(11,19)+' TH';},1000);
