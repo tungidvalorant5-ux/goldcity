@@ -228,6 +228,20 @@ body{font-family:var(--mono);font-size:12px;line-height:1.4;padding-block:10px 1
 .evn{margin-top:8px;font-family:var(--thai);font-size:11px;color:var(--muted);line-height:1.5}
 .evc.idle b{color:var(--muted);font-size:14px;font-family:var(--thai)}.evc b.sm{font-size:14px;font-family:var(--thai)}
 .dhs{font-family:var(--thai);font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+.rv{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px}
+.rvf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rvf label{display:flex;flex-direction:column;gap:3px;font-family:var(--thai);font-size:11.5px;color:var(--muted)}
+.rvf input,.rvf select{font:600 14px "JetBrains Mono",monospace;padding:7px 8px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2);color:var(--fg);width:100%;min-width:0}
+.rvf input:focus-visible,.rvf select:focus-visible,.rvb button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+.rvb{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.rvd{border:1px solid var(--line2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--panel2)}
+.rvv{font:800 26px "JetBrains Mono",monospace;letter-spacing:.04em}
+.rvv.pass{color:var(--green)}.rvv.warn{color:var(--amber)}.rvv.skip{color:var(--pink)}
+.rvn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.rvn div{display:flex;flex-direction:column}.rvn small{font-family:var(--thai);font-size:11px;color:var(--muted)}.rvn b{font:700 14px "JetBrains Mono",monospace}
+.rvl{margin:0;padding-left:0;list-style:none;font-family:var(--thai);font-size:12.5px;line-height:1.55}
+.rvl li.bad{color:var(--pink)}.rvl li.wr{color:var(--amber)}.rvl li.ok{color:var(--fg2)}
+@media (max-width:820px){.rv{grid-template-columns:minmax(0,1fr)}.rvf{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:820px){.evk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mtfsum{font-family:var(--thai);font-weight:700;font-size:13.5px;text-align:center;padding:6px;border:1px dashed var(--line2);border-radius:3px}
 /* signal + live chart */
@@ -306,6 +320,27 @@ body{font-family:var(--mono);font-size:12px;line-height:1.4;padding-block:10px 1
   <section class="panel dh" aria-label="Data Health ความถูกต้องของข้อมูล">
     <div class="ph"><span class="t">🩺 Data Health · ข้อมูลเชื่อได้ไหม</span><span class="lbl" id="dhSt">กำลังตรวจ…</span></div>
     <div id="dhBody"><div class="mu" style="font-family:var(--thai);font-size:12.5px">ตรวจราคา แท่ง M5 ปฏิทินข่าว และ spread จาก MT5 ทุก 1 นาที</div></div>
+  </section>
+  <section class="panel" aria-label="Risk Validator ตรวจความเสี่ยงก่อนเข้าไม้">
+    <div class="ph"><span class="t">🛡 Risk Validator · เข้าไม้นี้ได้ไหม</span><span class="lbl" id="rvSt">ใส่ Entry + SL แล้วดูผล</span></div>
+    <div class="rv">
+      <div>
+        <div class="rvf">
+          <label>ทิศทาง<select id="rvDir"><option value="1">BUY</option><option value="-1">SELL</option></select></label>
+          <label>Entry (ราคากราฟ)<input id="rvEnt" inputmode="decimal" autocomplete="off"></label>
+          <label>Stop Loss<input id="rvSl" inputmode="decimal" autocomplete="off"></label>
+          <label>Take Profit (ถ้ามี)<input id="rvTp" inputmode="decimal" autocomplete="off"></label>
+          <label>ล็อต<input id="rvLot" inputmode="decimal" value="0.1"></label>
+          <label>ทุน ($)<input id="rvCap" inputmode="decimal" value="31"></label>
+          <label>เสี่ยงได้สูงสุด (%)<input id="rvMax" inputmode="decimal" value="2"></label>
+          <label>1 ล็อต = กี่ออนซ์<input id="rvOz" inputmode="decimal" value="1"></label>
+          <label>ล็อตต่ำสุด<input id="rvMin" inputmode="decimal" value="0.1"></label>
+        </div>
+        <div class="rvb"><button class="stest" id="rvNow">ใช้ราคาตอนนี้เป็น Entry</button><button class="stest" id="rvClr">ล้าง</button></div>
+      </div>
+      <div class="rvd" aria-live="polite"><div class="rvv" id="rvV">—</div><div class="rvn" id="rvN"></div><ul class="rvl" id="rvL"></ul></div>
+    </div>
+    <div class="evn">คิด spread จริงจาก MT5 · GOLDm# 1 ล็อต = 1 ออนซ์ ($1 ต่อ 1 ล็อตต่อราคาทอง $1) · ถ้า SKIP <b>อย่าบีบ SL ให้แคบลงเพื่อฝืนเข้า</b> ให้ข้ามไม้นั้น · เครื่องมือช่วยตัดสินใจ ไม่ได้ส่งออเดอร์</div>
   </section>
   <section class="panel evl" aria-label="Event Lab ผลของข่าวต่อราคาทอง">
     <div class="ph"><span class="t">🧪 Event Lab · ทองทำตัวยังไงรอบข่าว</span><span class="lbl"><span id="evlSt">ข้อมูลจริงจาก MT5 · กดเพื่อวิเคราะห์</span> <button id="evlBtn" class="stest">▶ วิเคราะห์ข่าวย้อนหลัง</button></span></div>
@@ -1468,6 +1503,47 @@ function dhRender(){const box=$('dhBody'),st=$('dhSt');if(!box)return;const now=
   `<div class="evn">ตรวจทุก 1 นาที · spread "ปกติ" = ค่ากลางของ 288 แท่งล่าสุด (24 ชม.) · ถ่างเกิน 1.8× = ระวัง · เกิน 3× = ไม่ควรเข้า</div>`;
  if(box.dataset.h!==html){box.innerHTML=html;box.dataset.h=html;}}
 setTimeout(dhPoll,4000);setInterval(dhPoll,60000);setInterval(dhRender,5000);
+/* ---------- Risk Validator: PASS / SKIP ก่อนเข้าไม้ ---------- */
+const RV={keys:['rvCap','rvMax','rvOz','rvMin','rvLot']};
+try{const sv=JSON.parse(localStorage.getItem('su_rv')||'{}');for(const k of RV.keys)if(sv[k]!=null)$(k).value=sv[k];}catch(e){}
+function rvNum(id){const v=parseFloat(String($(id).value).replace(/,/g,''));return isFinite(v)?v:NaN;}
+function rvRun(){const dir=+$('rvDir').value,ent=rvNum('rvEnt'),sl=rvNum('rvSl'),tp=rvNum('rvTp'),lot=rvNum('rvLot'),cap=rvNum('rvCap'),mx=rvNum('rvMax'),oz=rvNum('rvOz'),minL=rvNum('rvMin');
+ try{const sv={};for(const k of RV.keys)sv[k]=$(k).value;localStorage.setItem('su_rv',JSON.stringify(sv));}catch(e){}
+ const V=$('rvV'),N=$('rvN'),L=$('rvL'),st=$('rvSt');
+ if(!(ent>0)||!(sl>0)){V.textContent='—';V.className='rvv';N.innerHTML='';L.innerHTML='<li class="ok">ใส่ Entry และ Stop Loss</li>';st.textContent='ใส่ Entry + SL แล้วดูผล';return;}
+ const sp=LIVE.on&&LIVE.spread>0?LIVE.spread:0.3,spSrc=LIVE.on&&LIVE.spread>0?'MT5 ตอนนี้':'ประมาณ';
+ const dist=dir===1?ent-sl:sl-ent;const bad=[],wr=[],ok=[];
+ if(!(dist>0)){V.textContent='SKIP';V.className='rvv skip';N.innerHTML='';L.innerHTML=`<li class="bad">SL อยู่ผิดฝั่ง · ${dir===1?'BUY ต้องตั้ง SL ต่ำกว่า Entry':'SELL ต้องตั้ง SL สูงกว่า Entry'}</li>`;st.textContent='SL ผิดฝั่ง';return;}
+ const per=(dist+sp)*oz;            // ขาดทุนต่อ 1 ล็อตถ้าโดน SL (รวม spread)
+ const risk=per*lot,riskP=risk/cap*100,budget=cap*mx/100;
+ const lotFit=Math.floor(budget/per*100)/100,maxDist=budget/(minL*oz)-sp;
+ let rr=NaN;if(tp>0){const gain=(dir===1?tp-ent:ent-tp)-sp;rr=gain/(dist+sp);}
+ // 1) ความเสี่ยงต่อทุน
+ if(!(lot>=minL))bad.push(`ล็อต ${lot} ต่ำกว่าขั้นต่ำ ${minL}`);
+ if(riskP>mx)bad.push(`เสี่ยง $${risk.toFixed(2)} = ${riskP.toFixed(1)}% เกินเพดาน ${mx}% ($${budget.toFixed(2)})`);
+ else ok.push(`เสี่ยง $${risk.toFixed(2)} = ${riskP.toFixed(1)}% ของทุน (เพดาน ${mx}%)`);
+ if(lotFit<minL)bad.push(`แม้ล็อตต่ำสุด ${minL} ก็เสี่ยงเกิน · SL ต้องห่างไม่เกิน $${Math.max(0,maxDist).toFixed(2)} ถึงจะเข้าได้`);
+ else if(lot>lotFit+1e-9)wr.push(`ล็อตที่พอดีกับเพดานคือ ${Math.max(minL,lotFit).toFixed(2)}`);
+ // 2) RR หลังหัก spread
+ if(isFinite(rr)){if(rr<=0)bad.push('TP อยู่ผิดฝั่ง หรือใกล้กว่า spread');else if(rr<1.5)wr.push(`RR หลังหัก spread = 1:${rr.toFixed(2)} ต่ำกว่า 1.5`);else ok.push(`RR หลังหัก spread = 1:${rr.toFixed(2)}`);}
+ else wr.push('ยังไม่ได้ใส่ TP · ดู RR ไม่ได้');
+ // 3) spread / ข้อมูล / ข่าว / ตำรวจ
+ const med=typeof DH!=='undefined'?dhMed(DH.sp.map(r=>r.sp_avg==null?null:+r.sp_avg)):NaN;
+ if(isFinite(med)&&sp/med>3)bad.push(`spread ${sp.toFixed(2)} ถ่าง ${(sp/med).toFixed(1)}× ของปกติ`);else if(isFinite(med)&&sp/med>1.8)wr.push(`spread ${sp.toFixed(2)} ถ่าง ${(sp/med).toFixed(1)}× ของปกติ`);
+ if(sp>dist*0.25)wr.push(`spread กินระยะ SL ไป ${(sp/dist*100).toFixed(0)}% · SL แคบเกินไปเมื่อเทียบกับต้นทุน`);
+ if(typeof DH!=='undefined'&&DH.state==='stale')bad.push('Data Health: ข้อมูลไม่สด ('+DH.why+') · เช็กราคาใน MT5');
+ const gv=$('gv');if(gv&&gv.classList.contains('stop'))wr.push('News Gate: อยู่ในช่วงข่าว · ราคาเหวี่ยงและ spread อาจถ่าง');
+ if(typeof GOV!=='undefined'&&!GOV.ok)bad.push('ตำรวจ Risk Governor: '+GOV.why);
+ if(typeof SESS!=='undefined'&&SESS.closed&&!SESS.force)wr.push('ตลาดปิดอยู่');
+ const verdict=bad.length?'skip':wr.length?'warn':'pass';
+ V.textContent=verdict==='skip'?'SKIP · ข้ามไม้นี้':verdict==='warn'?'PASS · แต่ระวัง':'PASS';V.className='rvv '+verdict;
+ st.innerHTML=`<span class="dhs" style="color:${verdict==='skip'?'var(--pink)':verdict==='warn'?'var(--amber)':'var(--green)'}">${verdict.toUpperCase()}</span>`;
+ N.innerHTML=[['เสี่ยง',`$${risk.toFixed(2)}`],['% ทุน',`${riskP.toFixed(1)}%`],['RR สุทธิ',isFinite(rr)?'1:'+rr.toFixed(2):'—'],['ระยะ SL',`$${dist.toFixed(2)}`],['spread',`${sp.toFixed(2)}`],['SL กว้างสุดที่รับได้',maxDist>0?`$${maxDist.toFixed(2)}`:'—']].map(([k,v])=>`<div><small>${k}</small><b>${v}</b></div>`).join('');
+ L.innerHTML=bad.map(x=>`<li class="bad">✗ ${x}</li>`).join('')+wr.map(x=>`<li class="wr">⚠ ${x}</li>`).join('')+ok.map(x=>`<li class="ok">✓ ${x}</li>`).join('')+`<li class="ok">spread: ${spSrc}</li>`;}
+['rvDir','rvEnt','rvSl','rvTp','rvLot','rvCap','rvMax','rvOz','rvMin'].forEach(id=>$(id).addEventListener('input',rvRun));
+$('rvNow').addEventListener('click',()=>{if(S.px>0){$('rvEnt').value=S.px.toFixed(2);rvRun();}});
+$('rvClr').addEventListener('click',()=>{['rvEnt','rvSl','rvTp'].forEach(id=>$(id).value='');rvRun();});
+setInterval(()=>{if($('rvEnt').value&&$('rvSl').value)rvRun();},5000);rvRun();
 /* ข่าวจากปฏิทิน MT5 */
 async function liveNews(){try{const since=Math.floor(Date.now()/1000)-2*86400;const rows=await sbGet(`news?select=*&t=gte.${since}&order=t.asc`);
   NEWS.ev=rows.map(r=>({t:new Date(r.t*1000).toISOString(),title:r.title,th:r.title,impact:r.impact,fc:r.fc,prev:r.prev,act:r.act,allDay:r.allday}));
