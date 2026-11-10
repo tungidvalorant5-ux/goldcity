@@ -226,6 +226,8 @@ body{font-family:var(--mono);font-size:12px;line-height:1.4;padding-block:10px 1
 .evt th{font-family:var(--thai);font-weight:500;color:var(--muted);text-align:right;padding:5px 6px;border-bottom:1px solid var(--line2)}.evt th:first-child,.evt td:first-child{text-align:left}
 .evt td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}.evt td i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px}
 .evn{margin-top:8px;font-family:var(--thai);font-size:11px;color:var(--muted);line-height:1.5}
+.evc.idle b{color:var(--muted);font-size:14px;font-family:var(--thai)}.evc b.sm{font-size:14px;font-family:var(--thai)}
+.dhs{font-family:var(--thai);font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
 @media (max-width:820px){.evk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mtfsum{font-family:var(--thai);font-weight:700;font-size:13.5px;text-align:center;padding:6px;border:1px dashed var(--line2);border-radius:3px}
 /* signal + live chart */
@@ -301,6 +303,10 @@ body{font-family:var(--mono);font-size:12px;line-height:1.4;padding-block:10px 1
     </section>
   </div>
 
+  <section class="panel dh" aria-label="Data Health ความถูกต้องของข้อมูล">
+    <div class="ph"><span class="t">🩺 Data Health · ข้อมูลเชื่อได้ไหม</span><span class="lbl" id="dhSt">กำลังตรวจ…</span></div>
+    <div id="dhBody"><div class="mu" style="font-family:var(--thai);font-size:12.5px">ตรวจราคา แท่ง M5 ปฏิทินข่าว และ spread จาก MT5 ทุก 1 นาที</div></div>
+  </section>
   <section class="panel evl" aria-label="Event Lab ผลของข่าวต่อราคาทอง">
     <div class="ph"><span class="t">🧪 Event Lab · ทองทำตัวยังไงรอบข่าว</span><span class="lbl"><span id="evlSt">ข้อมูลจริงจาก MT5 · กดเพื่อวิเคราะห์</span> <button id="evlBtn" class="stest">▶ วิเคราะห์ข่าวย้อนหลัง</button></span></div>
     <div id="evlBody"><div class="mu" style="font-family:var(--thai);font-size:12.5px">ดูว่าก่อน–หลังข่าว USD ทองเหวี่ยงแรงแค่ไหน นานกี่นาที ข่าวไหนอันตรายจริง และกฎงดเทรด 30 นาทีเหมาะหรือยัง · ใช้แท่ง M5 กับปฏิทินข่าวที่ EA ส่งขึ้นมา</div></div>
@@ -1414,8 +1420,54 @@ async function livePoll(){const now=Date.now();
 function livePill(){const p=$('livePill');if(!p)return;const age=LIVE.qAt?(Date.now()-LIVE.qAt)/1000:1e9;
  if(!LIVE.on){p.textContent=LIVE.err?'● เชื่อม MT5 ไม่ได้ · ราคาจำลอง':'● กำลังเชื่อม MT5…';p.style.color=C.amber;p.style.borderColor='rgba(255,178,62,.55)';return;}
  if(typeof SESS!=='undefined'&&SESS.closed&&!SESS.force){p.textContent=`● ตลาดปิด · ราคาล่าสุด ${CFG.SYMBOL}`;p.style.color=C.muted;p.style.borderColor='var(--line2)';return;}
+ if(age<20&&typeof DH!=='undefined'&&DH.state==='stale'){p.textContent=`● DATA STALE · ${DH.why}`;p.style.color=C.pink;p.style.borderColor='rgba(255,61,113,.6)';return;}
  if(age<20){p.textContent=`● LIVE MT5 · ${CFG.SYMBOL}`+(LIVE.spread?` · spread ${LIVE.spread.toFixed(2)}`:'');p.style.color=C.green;p.style.borderColor='rgba(46,230,160,.55)';}
  else{p.textContent=`● MT5 ไม่ส่งข้อมูล ${age<3600?Math.round(age/60)+' นาที':'นานแล้ว'} (ตลาดปิด / ปิดเครื่อง?)`;p.style.color=C.amber;p.style.borderColor='rgba(255,178,62,.55)';}}
+/* ---------- Data Health + Spread Monitor ---------- */
+const DH={sp:[],lastT:0,newsUp:0,err:'',state:'',why:''};
+const dhMed=a=>{a=a.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y);return a.length?a[a.length>>1]:NaN;};
+async function dhPoll(){if(!LIVE.on){dhRender();return;}
+ try{const q=`&symbol=eq.${SYM}&tf=eq.M5&order=t.desc&limit=288`;let rows;try{rows=await sbGet('candles?select=t,sp_avg,sp_max,sp_mt5'+q);}catch(e){rows=await sbGet('candles?select=t'+q);}
+  DH.sp=rows;DH.lastT=rows[0]?+rows[0].t:0;
+  const n=await sbGet('news?select=updated_at&order=updated_at.desc&limit=1');DH.newsUp=n[0]?Date.parse(n[0].updated_at):0;DH.err='';}
+ catch(e){DH.err=String(e.message||e);}
+ dhRender();}
+function dhRender(){const box=$('dhBody'),st=$('dhSt');if(!box)return;const now=Date.now();
+ const closed=typeof SESS!=='undefined'&&SESS.closed&&!SESS.force;
+ if(!LIVE.on){st.textContent=LIVE.err?'เชื่อม MT5 ไม่ได้':'กำลังเชื่อม…';DH.state='';return;}
+ const ago=s=>s<90?Math.round(s)+' วินาที':s<5400?Math.round(s/60)+' นาที':(s/3600).toFixed(1)+' ชม.';
+ const K=[];
+ // 1) ราคา
+ const qAge=LIVE.qAt?(now-LIVE.qAt)/1000:1e9;
+ K.push(closed?{k:'ราคา',c:'idle',b:'ตลาดปิด',s:'อัปเดตล่าสุด '+ago(qAge)+'ที่แล้ว'}:qAge<20?{k:'ราคา',c:'ok',b:'สด',s:ago(qAge)+'ที่แล้ว'}:qAge<60?{k:'ราคา',c:'mid',b:'ช้า',s:ago(qAge)+'ที่แล้ว'}:{k:'ราคา',c:'low',b:'หยุดส่ง',s:ago(qAge)+'ที่แล้ว · เช็ก MT5 / EA',bad:'ราคาไม่อัปเดต'});
+ // 2) แท่ง M5 (ตรวจเวลาเพี้ยนแบบ DST ด้วย)
+ const lag=DH.lastT?(now/1000-DH.lastT)/60:1e9;
+ K.push(closed?{k:'แท่ง M5',c:'idle',b:'ตลาดปิด',s:'แท่งล่าสุด '+ago(lag*60)+'ที่แล้ว'}:
+  (lag>50&&lag<70)||(lag<-50&&lag>-70)?{k:'แท่ง M5',c:'low',b:'เวลาเพี้ยน ~1 ชม.',s:'เวลาแท่งไม่ตรงนาฬิกา (DST?) · อัปเดต EA',bad:'เวลาแท่งเพี้ยน'}:
+  lag<-6?{k:'แท่ง M5',c:'low',b:'เวลาล้ำอนาคต',s:Math.round(-lag)+' นาที · offset เวลาผิด',bad:'เวลาแท่งเพี้ยน'}:
+  lag<=6?{k:'แท่ง M5',c:'ok',b:'ตรงเวลา',s:'แท่งล่าสุด '+Math.max(0,Math.round(lag))+' นาที'}:
+  lag<=15?{k:'แท่ง M5',c:'mid',b:'ช้า',s:'แท่งล่าสุด '+Math.round(lag)+' นาที'}:{k:'แท่ง M5',c:'low',b:'ขาดหาย',s:'แท่งล่าสุด '+ago(lag*60)+'ที่แล้ว',bad:'แท่ง M5 ขาด'});
+ // 3) ปฏิทินข่าว (EA ส่งทุก 10 นาที)
+ const nAge=DH.newsUp?(now-DH.newsUp)/60000:1e9;
+ K.push(!DH.newsUp?{k:'ปฏิทินข่าว',c:'low',b:'ไม่มีข้อมูล',s:'EA ยังไม่ส่งข่าว',bad:'ไม่มีปฏิทินข่าว'}:
+  closed?{k:'ปฏิทินข่าว',c:'idle',b:'ตลาดปิด',s:'อัปเดต '+ago(nAge*60)+'ที่แล้ว'}:
+  nAge<=15?{k:'ปฏิทินข่าว',c:'ok',b:'สด',s:'อัปเดต '+Math.round(nAge)+' นาทีที่แล้ว'}:
+  nAge<=40?{k:'ปฏิทินข่าว',c:'mid',b:'ช้า',s:'อัปเดต '+Math.round(nAge)+' นาทีที่แล้ว'}:{k:'ปฏิทินข่าว',c:'low',b:'เก่า',s:'อัปเดต '+ago(nAge*60)+'ที่แล้ว · News Gate อาจไม่ครบ',bad:'ปฏิทินข่าวเก่า'});
+ // 4) Spread (ใช้ค่าที่ EA วัด ถ้ายังไม่มีใช้ค่าที่ MT5 เก็บกับแท่ง)
+ const own=DH.sp.filter(r=>r.sp_avg!=null),src=own.length>=12?'sp_avg':'sp_mt5';
+ const med=dhMed(DH.sp.map(r=>r[src]==null?null:+r[src])),mx=Math.max(0,...DH.sp.map(r=>+(r.sp_max??r.sp_mt5??0)));
+ const cur=LIVE.spread;
+ if(!isFinite(med)||!(cur>0))K.push({k:'Spread',c:'idle',b:cur>0?cur.toFixed(2):'—',s:'ยังไม่มีสถิติ · รัน SQL ภาค 4 + EA v2.3'});
+ else{const x=cur/med,sub=`ปกติ ${med.toFixed(2)} · สูงสุด 24 ชม. ${mx.toFixed(2)}`+(src==='sp_mt5'?' · (ค่า MT5)':'');
+  K.push(closed?{k:'Spread',c:'idle',b:cur.toFixed(2),s:sub}:x<=1.8?{k:'Spread',c:'ok',b:cur.toFixed(2),s:sub}:x<=3?{k:'Spread',c:'mid',b:cur.toFixed(2)+' ถ่าง '+x.toFixed(1)+'×',s:sub+' · ระวังเข้าไม้'}:{k:'Spread',c:'low',b:cur.toFixed(2)+' ถ่าง '+x.toFixed(1)+'×',s:sub+' · ไม่ควรเข้าไม้ตอนนี้'});}
+ const bad=K.filter(k=>k.bad),warn=K.filter(k=>k.c==='mid'||(k.k==='Spread'&&k.c==='low'));
+ DH.state=closed?'closed':bad.length?'stale':warn.length?'warn':'ok';DH.why=bad.map(k=>k.bad).join(' · ');
+ st.innerHTML=DH.err?'<span class="dhs" style="color:var(--amber)">ตรวจไม่ได้</span>':DH.state==='stale'?'<span class="dhs" style="color:var(--pink)">DATA STALE / INVALID</span>':DH.state==='warn'?'<span class="dhs" style="color:var(--amber)">ระวัง</span>':DH.state==='closed'?'<span class="dhs" style="color:var(--muted)">ตลาดปิด</span>':'<span class="dhs" style="color:var(--green)">ข้อมูลปกติ</span>';
+ const html=`<div class="evk">${K.map(k=>`<div class="evc ${k.c}"><span class="lbl">${k.k}</span><b class="${k.c==='ok'?'':'sm'}">${k.b}</b><small>${k.s}</small></div>`).join('')}</div>`+
+  (DH.state==='stale'?`<div class="evr" style="border-color:rgba(255,61,113,.6);background:rgba(255,61,113,.07)"><b>⚠ ข้อมูลผิดปกติ:</b> ${DH.why} · <b>อย่าใช้กราฟ สัญญาณ และ News Gate ในหน้านี้ตัดสินใจ</b> จนกว่าจะกลับเป็นปกติ · ดูราคาใน MT5 แทน</div>`:'')+
+  `<div class="evn">ตรวจทุก 1 นาที · spread "ปกติ" = ค่ากลางของ 288 แท่งล่าสุด (24 ชม.) · ถ่างเกิน 1.8× = ระวัง · เกิน 3× = ไม่ควรเข้า</div>`;
+ if(box.dataset.h!==html){box.innerHTML=html;box.dataset.h=html;}}
+setTimeout(dhPoll,4000);setInterval(dhPoll,60000);setInterval(dhRender,5000);
 /* ข่าวจากปฏิทิน MT5 */
 async function liveNews(){try{const since=Math.floor(Date.now()/1000)-2*86400;const rows=await sbGet(`news?select=*&t=gte.${since}&order=t.asc`);
   NEWS.ev=rows.map(r=>({t:new Date(r.t*1000).toISOString(),title:r.title,th:r.title,impact:r.impact,fc:r.fc,prev:r.prev,act:r.act,allDay:r.allday}));
